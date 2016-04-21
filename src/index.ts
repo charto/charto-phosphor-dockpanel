@@ -127,9 +127,19 @@ const PANEL_BOTTOM_CLASS = 'p-mod-panel-bottom';
 const PANEL_CENTER_CLASS = 'p-mod-panel-center';
 
 /**
+ * The class named added to tab bar panel dock overlays.
+ */
+const PANEL_TAB_CLASS = 'p-mod-panel-tab';
+
+/**
  * The factory MIME type supported by the dock panel.
  */
 const FACTORY_MIME = 'application/x-phosphor-widget-factory';
+
+/**
+ * The size of the top edge dock zone for the root panel.
+ */
+const EDGE_TOP_SIZE = 10;
 
 /**
  * The size of the edge dock zone for the root panel.
@@ -438,6 +448,11 @@ const enum DockZone {
   PanelCenter,
 
   /**
+   * The dock zone in the tab bar of a tab panel.
+   */
+  PanelTab,
+
+  /**
    * An invalid dock zone.
    */
   Invalid,
@@ -512,7 +527,8 @@ class DockPanelOverlay extends NodeWrapper {
     PANEL_LEFT_CLASS,
     PANEL_RIGHT_CLASS,
     PANEL_BOTTOM_CLASS,
-    PANEL_CENTER_CLASS
+    PANEL_CENTER_CLASS,
+    PANEL_TAB_CLASS
   ];
 
   /**
@@ -821,6 +837,14 @@ namespace DockPanelPrivate {
       width = pcr.width;
       height = pcr.height;
       break;
+    case DockZone.PanelTab:
+      let tabRect = target.panel.tabBar.node.getBoundingClientRect();
+      pcr = target.panel.node.getBoundingClientRect();
+      top = pcr.top - rect.top - box.borderTop;
+      left = pcr.left - rect.left - box.borderLeft;
+      width = pcr.width;
+      height = tabRect.height;
+      break;
     }
 
     // Show the overlay and return the dock zone.
@@ -850,7 +874,7 @@ namespace DockPanelPrivate {
     if (!hitPanel) {
       return { zone: DockZone.Invalid, panel: null };
     }
-    let panelZone = getPanelZone(hitPanel.node, clientX, clientY);
+    let panelZone = getPanelZone(hitPanel, clientX, clientY);
     return { zone: panelZone, panel: hitPanel };
   }
 
@@ -921,6 +945,10 @@ namespace DockPanelPrivate {
       owner.insertBottom(widget, ref);
       return;
     case DockZone.PanelCenter:
+      owner.insertTabAfter(widget, ref);
+      selectWidget(owner, widget);
+      return;
+    case DockZone.PanelTab:
       owner.insertTabAfter(widget, ref);
       selectWidget(owner, widget);
       return;
@@ -1195,7 +1223,7 @@ namespace DockPanelPrivate {
       } else {
         zone = DockZone.RootRight;
       }
-    } else if (y < rect.top + EDGE_SIZE) {
+    } else if (y < rect.top + EDGE_TOP_SIZE) {
       zone = DockZone.RootTop;
     } else if (y >= rect.bottom - EDGE_SIZE) {
       zone = DockZone.RootBottom;
@@ -1212,12 +1240,15 @@ namespace DockPanelPrivate {
    *
    * This always returns a valid zone.
    */
-  function getPanelZone(node: HTMLElement, x: number, y: number): DockZone {
+  function getPanelZone(panel: DockTabPanel, x: number, y: number): DockZone {
     let zone: DockZone;
-    let rect = node.getBoundingClientRect();
+    let rect = panel.node.getBoundingClientRect();
+    let tabRect = panel.tabBar.node.getBoundingClientRect();
     let fracX = (x - rect.left) / rect.width;
     let fracY = (y - rect.top) / rect.height;
-    if (fracX < 1 / 3) {
+    if (y - rect.top < tabRect.height) {
+      zone = DockZone.PanelTab;
+    } else if (fracX < 1 / 3) {
       if (fracY < fracX) {
         zone = DockZone.PanelTop;
       } else if (1 - fracY < fracX) {
